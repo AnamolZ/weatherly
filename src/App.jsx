@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
+import { WiDaySunny, WiCloud, WiRain, WiSnow, WiThunderstorm, WiFog } from "react-icons/wi";
 import './App.css';
 
 function App() {
@@ -8,15 +9,21 @@ function App() {
   const [forecastList, setForecastList] = useState([]);
   const [showForecast, setShowForecast] = useState(false);
   const [city, setCity] = useState("");
+  const [error, setError] = useState(null);
   const API_KEY = "3d31ac07e02757a71b47243a959b954c";
 
-  const fetchWeather = async (cityName) => {
-    if (!cityName) return;
-
-    const currentWeatherUrl = `https://api.openweathermap.org/data/2.5/weather?q=${cityName}&units=metric&appid=${API_KEY}`;
-    const forecastUrl = `https://api.openweathermap.org/data/2.5/forecast?q=${cityName}&units=metric&appid=${API_KEY}`;
-
+  const fetchWeather = async (cityName, lat, lon) => {
     try {
+      setError(null);
+
+      const currentWeatherUrl = cityName
+        ? `https://api.openweathermap.org/data/2.5/weather?q=${cityName}&units=metric&appid=${API_KEY}`
+        : `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&units=metric&appid=${API_KEY}`;
+
+      const forecastUrl = cityName
+        ? `https://api.openweathermap.org/data/2.5/forecast?q=${cityName}&units=metric&appid=${API_KEY}`
+        : `https://api.openweathermap.org/data/2.5/forecast?lat=${lat}&lon=${lon}&units=metric&appid=${API_KEY}`;
+
       const [res1, res2] = await Promise.all([fetch(currentWeatherUrl), fetch(forecastUrl)]);
       if (!res1.ok) throw new Error("City not found");
       if (!res2.ok) throw new Error("Forecast not found");
@@ -27,12 +34,21 @@ function App() {
       setWeatherData(currentData);
       setForecastList(forecastData.list.filter(item => item.dt_txt.includes("12:00:00")));
     } catch (err) {
+      setError(err.message);
       console.error("Error fetching weather:", err.message);
     }
   };
 
   useEffect(() => {
-    fetchWeather("Kathmandu");
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude, longitude } = pos.coords;
+        fetchWeather(null, latitude, longitude);
+      },
+      () => {
+        fetchWeather("Kathmandu");
+      }
+    );
   }, []);
 
   const handleKeyPress = (e) => {
@@ -51,28 +67,40 @@ function App() {
 
   const displayTemp = weatherData ? formatTemp(weatherData.main.temp) : "--";
 
+  const getWeatherIcon = (description) => {
+    const d = description.toLowerCase();
+    if (d.includes("clear")) return <WiDaySunny className="w-16 h-16 text-yellow-300" />;
+    if (d.includes("cloud")) return <WiCloud className="w-16 h-16 text-gray-300" />;
+    if (d.includes("rain")) return <WiRain className="w-16 h-16 text-blue-400" />;
+    if (d.includes("snow")) return <WiSnow className="w-16 h-16 text-white" />;
+    if (d.includes("thunder")) return <WiThunderstorm className="w-16 h-16 text-purple-500" />;
+    if (d.includes("fog") || d.includes("mist")) return <WiFog className="w-16 h-16 text-gray-400" />;
+    return <WiCloud className="w-16 h-16 text-gray-300" />;
+  };
+
   return (
     <div className='flex justify-center h-screen bg-[#2596be] p-4'>
       <div className='flex flex-col items-center mt-[100px] gap-8 w-full max-w-[600px]'>
+
         <div id='weather-search' className='w-full'>
-          <input
-            type="text"
-            value={city}
-            placeholder="Enter city name"
+          <input type="text" value={city} placeholder="Enter city name"
             onChange={(e) => setCity(e.target.value)}
             onKeyPress={handleKeyPress}
             className='w-full h-[50px] rounded-lg px-6 shadow-xl outline-none text-gray-700 text-lg'
           />
         </div>
 
+        {error && (
+          <div className="bg-blue-400 text-white p-3 rounded-lg shadow-md w-full text-center">
+            {error}
+          </div>
+        )}
+
         {weatherData && (
           <>
             <div className="flex justify-center w-full">
-              <Button
-                variant="secondary"
-                onClick={() => setShowForecast(!showForecast)}
-                className="bg-white/20 hover:bg-white/30 text-white border-none shadow-md backdrop-blur-sm h-10 px-6"
-              >
+              <Button variant="secondary" onClick={() => setShowForecast(!showForecast)}
+                className="bg-white/20 hover:bg-white/30 text-white border-none shadow-md backdrop-blur-sm h-10 px-6" >
                 {showForecast ? "Back to Current Weather" : "Show 5-Day Forecast"}
               </Button>
             </div>
@@ -81,17 +109,19 @@ function App() {
               <div className="bg-white/20 backdrop-blur-md rounded-xl p-8 text-white w-full shadow-lg flex flex-col items-center">
                 <div className="flex items-center justify-center gap-3 mb-2">
                   <h2 className="text-3xl font-bold text-center">{weatherData.name}, {weatherData.sys.country}</h2>
-                  <Button
-                    variant="secondary"
-                    size="icon"
-                    onClick={toggleUnit}
-                    className="bg-white/30 hover:bg-white/50 rounded-full w-8 h-8 flex items-center justify-center text-xs font-bold border-none text-white"
-                  >
+                  <Button variant="secondary" size="icon" onClick={toggleUnit}
+                   className="bg-white/30 hover:bg-white/50 rounded-full w-8 h-8 flex items-center justify-center text-xs font-bold border-none text-white" >
                     °{unit === 'C' ? 'F' : 'C'}
                   </Button>
                 </div>
+
+                <div className="mb-4">
+                  {getWeatherIcon(weatherData.weather[0].description)}
+                </div>
+
                 <div className="text-6xl font-bold mb-4">{displayTemp}°{unit}</div>
                 <p className="text-xl capitalize mb-4">{weatherData.weather[0].description}</p>
+
                 <div className="flex justify-between w-full mt-4 bg-white/10 rounded-lg p-4">
                   <div className="flex flex-col items-center">
                     <span className="text-sm opacity-80">Humidity</span>
@@ -123,7 +153,10 @@ function App() {
                             {new Date(day.dt_txt).toLocaleDateString('en-US', { month: 'short', day: '2-digit' })}
                           </td>
                           <td className="p-3">{formatTemp(day.main.temp)}°{unit}</td>
-                          <td className="p-3 capitalize">{day.weather[0].description}</td>
+                          <td className="p-3 capitalize flex items-center gap-2">
+                            {getWeatherIcon(day.weather[0].description)}
+                            <span>{day.weather[0].description}</span>
+                          </td>
                           <td className="p-3">{day.main.humidity}%</td>
                         </tr>
                       ))}
@@ -140,5 +173,3 @@ function App() {
 }
 
 export default App;
-
-
