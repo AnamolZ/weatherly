@@ -10,29 +10,26 @@ function App() {
   const [showForecast, setShowForecast] = useState(false);
   const [city, setCity] = useState("");
   const [error, setError] = useState(null);
-  const API_KEY = "3d31ac07e02757a71b47243a959b954c";
-
   const fetchWeather = async (cityName, lat, lon) => {
     try {
       setError(null);
 
-      const currentWeatherUrl = cityName
-        ? `https://api.openweathermap.org/data/2.5/weather?q=${cityName}&units=metric&appid=${API_KEY}`
-        : `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&units=metric&appid=${API_KEY}`;
+      const baseUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api/weather/';
+      const url = cityName
+        ? `${baseUrl}?city=${cityName}`
+        : `${baseUrl}?lat=${lat}&lon=${lon}`;
 
-      const forecastUrl = cityName
-        ? `https://api.openweathermap.org/data/2.5/forecast?q=${cityName}&units=metric&appid=${API_KEY}`
-        : `https://api.openweathermap.org/data/2.5/forecast?lat=${lat}&lon=${lon}&units=metric&appid=${API_KEY}`;
 
-      const [res1, res2] = await Promise.all([fetch(currentWeatherUrl), fetch(forecastUrl)]);
-      if (!res1.ok) throw new Error("City not found");
-      if (!res2.ok) throw new Error("Forecast not found");
+      const res = await fetch(url);
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || "Failed to fetch weather data");
+      }
 
-      const currentData = await res1.json();
-      const forecastData = await res2.json();
+      const data = await res.json();
 
-      setWeatherData(currentData);
-      setForecastList(forecastData.list.filter(item => item.dt_txt.includes("12:00:00")));
+      setWeatherData(data.current);
+      setForecastList(data.forecast.list.filter(item => item.dt_txt.includes("12:00:00")));
     } catch (err) {
       setError(err.message);
       console.error("Error fetching weather:", err.message);
@@ -110,7 +107,7 @@ function App() {
                 <div className="flex items-center justify-center gap-3 mb-2">
                   <h2 className="text-3xl font-bold text-center">{weatherData.name}, {weatherData.sys.country}</h2>
                   <Button variant="secondary" size="icon" onClick={toggleUnit}
-                   className="bg-white/30 hover:bg-white/50 rounded-full w-8 h-8 flex items-center justify-center text-xs font-bold border-none text-white" >
+                    className="bg-white/30 hover:bg-white/50 rounded-full w-8 h-8 flex items-center justify-center text-xs font-bold border-none text-white" >
                     °{unit === 'C' ? 'F' : 'C'}
                   </Button>
                 </div>
