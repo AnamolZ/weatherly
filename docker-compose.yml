@@ -1,0 +1,31 @@
+services:
+  backend:
+    build:
+      context: ./src/backend
+      dockerfile: ../../deploy/docker/backend.Dockerfile
+    volumes:
+      - ./src/backend:/app
+    ports:
+      - "8000:8000"
+    environment:
+      - LOG_LEVEL=INFO
+      - DEBUG=False
+    env_file:
+      - ./src/backend/.env
+    container_name: weather_backend_prod
+    restart: always
+
+  frontend:
+    build:
+      context: ./go-http-server
+    volumes:
+      - ./deploy/dist:/app/static
+    environment:
+      - SERVE_DIR=/app/static
+      - PORT=8080
+    ports:
+      - "80:8080" # Map host port 80 to container port 8080
+    container_name: weather_frontend_prod
+    restart: always
+    depends_on:
+      - backend
